@@ -26,9 +26,6 @@ DEST_CODEX="$DEST_CODEX_BASE/$SKILL_NAME"
 mkdir -p "$DEST_CLAUDE_BASE" "$DEST_CODEX_BASE"
 mkdir -p "$DEST_CODEX_PROMPTS_BASE"
 
-# Remove deprecated alias if present.
-rm -rf "$DEST_CLAUDE_BASE/sonarqube-autofix" "$DEST_CODEX_BASE/sonarqube-autofix"
-
 # Atomic install: copy to temp dirs first, then move into place so a failed
 # copy never leaves the destination in a broken state.
 DEST_CLAUDE_TMP="${DEST_CLAUDE}.installing"
@@ -50,10 +47,8 @@ rm -rf "$DEST_CLAUDE" "$DEST_CODEX"
 mv "$DEST_CLAUDE_TMP" "$DEST_CLAUDE"
 mv "$DEST_CODEX_TMP" "$DEST_CODEX"
 
-chmod +x "$DEST_CLAUDE/scripts/run_changed_scan.sh" \
-  "$DEST_CLAUDE/scripts/collect_changed_issues.py" \
-  "$DEST_CODEX/scripts/run_changed_scan.sh" \
-  "$DEST_CODEX/scripts/collect_changed_issues.py"
+chmod +x "$DEST_CLAUDE/scripts/sonarqube.py" \
+  "$DEST_CODEX/scripts/sonarqube.py"
 
 if [[ -f "$SRC_PROMPT" ]]; then
   cp "$SRC_PROMPT" "$DEST_CODEX_PROMPTS_BASE/sonarqube.md" || {
@@ -68,5 +63,4 @@ Installed $SKILL_NAME:
 - Codex:  $DEST_CODEX
 Codex slash command prompt:
 - $DEST_CODEX_PROMPTS_BASE/sonarqube.md
-Removed deprecated alias (if it existed): sonarqube-autofix
 EOF

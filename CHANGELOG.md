@@ -2,20 +2,30 @@
 
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
+## [1.1.0] - 2026-02-07
 
 ### Added
 
+- New-issues-only scope (`--scope new`): filters findings to changed lines via git diff hunk detection (default); `--scope changed` preserves file-level filtering
+- Repo config file `.sonarqube-skill.yaml` with precedence: CLI > env > config > defaults
+- Fix-plan generation: agent writes `fix-plan.md` and `fix-plan.json` before autofix loop
+- Blocked-finding classification with structured `blocked.json` output and classification codes
+- `changed-lines.json` output for debugging hunk-level filtering
 - Cloud mode implementation: MCP-first with SonarCloud REST API fallback
-- `--mode`, `--organization`, `--branch` flags for `collect_changed_issues.py`
 - Bearer token authentication for SonarCloud
 - MCP detection guidance in SKILL.md for cloud mode
 - Output schema documentation in SKILL.md
+- GitHub Actions release workflow for automated validation, changelog-based release notes, and npm publish to GitHub Packages
+- npm package support (`package.json`) for distribution via npm, OpenSkills, and skills.sh
+- Root-level `SKILL.md` symlink for marketplace auto-discovery
+- Multi-platform install instructions in README (OpenSkills, skills.sh, npm)
 
 ### Changed
 
+- Cloud mode autofix runs single-pass without re-scan verification (cloud API cannot reflect local fixes); agent advises user to verify via CI/CD after push
+- Consolidated `run_changed_scan.sh` and `collect_changed_issues.py` into single `sonarqube.py` script with `scan` and `fetch` subcommands
 - Repository restructured: single canonical source in `skill/` replaces duplicate `.agents/` and `.codex/` directories
-- Bash 3.2+ compatibility (macOS default `/bin/bash`); removed incorrect bash 4+ requirement
+- `bash` is no longer a prerequisite; the skill is now pure Python
 
 ### Fixed
 
@@ -25,7 +35,7 @@ All notable changes to this project are documented in this file.
 - Filenames containing commas now skipped from scanner inclusions with a warning
 - Install script uses atomic copy to prevent partial installs on failure
 
-## [1.0.0] - 2026-02-07
+## [1.0.0] - 2026-02-05
 
 ### Added
 

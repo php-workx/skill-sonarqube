@@ -1,0 +1,37 @@
+{
+  "name": "@php-workx/skill-sonarqube",
+  "version": "1.1.0",
+  "description": "SonarQube/SonarCloud skill for AI coding agents (Claude, Codex, Cursor). Scan changed files, list findings by severity, or autofix issues autonomously.",
+  "keywords": [
+    "skill",
+    "claude",
+    "codex",
+    "cursor",
+    "sonarqube",
+    "sonarcloud",
+    "code-quality",
+    "agent",
+    "ai-agent",
+    "openskills"
+  ],
+  "scripts": {
+    "validate": "python3 -m py_compile skill/scripts/sonarqube.py && bash -n scripts/install-sonarqube-skill.sh",
+    "prepublishOnly": "npm run validate"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/php-workx/skill-sonarqube.git"
+  },
+  "license": "MIT",
+  "files": [
+    "skill/",
+    "prompts/",
+    "scripts/",
+    "SKILL.md",
+    "README.md",
+    "LICENSE"
+  ]
+}

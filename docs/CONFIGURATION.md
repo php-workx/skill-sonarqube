@@ -43,6 +43,33 @@ Effective mapping used by scanner/API filters:
 - `low|minor -> MINOR`
 - `info -> INFO`
 
+## Repo Config File (`.sonarqube-skill.yaml`)
+
+Optional config file at the repo root. Provides defaults that can be overridden by environment variables or CLI flags.
+
+Precedence: CLI flags > environment variables > config file > hardcoded defaults.
+
+```yaml
+version: 1
+defaults:
+  mode: local          # local|cloud
+  severity: high       # blocker|high|medium|low|info
+  scope: new           # new|changed
+  max_passes: 8
+scan:
+  base_ref: origin/main
+  exclude_paths:
+    - vendor/**
+    - dist/**
+```
+
+- `version`: must be `1`. Unknown versions produce a warning and fall back to defaults.
+- `defaults.scope`: `new` filters to changed lines only; `changed` filters to changed files (previous behavior).
+- `scan.exclude_paths`: glob patterns excluded from scanner inclusions.
+- If the file is missing, all values use hardcoded defaults.
+- If the file is malformed, a warning is printed and defaults are used.
+- Uses PyYAML if available; falls back to a built-in parser for this schema.
+
 ## Installer Destination Overrides
 
 - `CLAUDE_SKILLS_DIR`: override destination base for Claude skill install.

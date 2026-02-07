@@ -2,23 +2,26 @@
 
 ## Pre-release Checklist
 
-1. Validate scripts syntax:
+1. Validate scripts:
 
 ```bash
-bash -n scripts/install-sonarqube-skill.sh
-bash -n skill/scripts/run_changed_scan.sh
-python3 -m py_compile skill/scripts/collect_changed_issues.py
+npm run validate
 ```
 
-2. Smoke-install locally:
+2. Preview npm package contents:
+
+```bash
+npm pack --dry-run
+```
+
+3. Smoke-install locally:
 
 ```bash
 bash scripts/install-sonarqube-skill.sh
 ```
 
-3. Restart Codex/Claude.
-4. Verify `/sonarqube list` resolves.
-5. Update `CHANGELOG.md`.
+4. Restart Codex/Claude.
+5. Verify `/sonarqube list` resolves.
 
 ## Versioning
 
@@ -29,16 +32,42 @@ Use semantic versioning:
 - `v1.1.0`: new backward-compatible feature
 - `v2.0.0`: breaking behavior change
 
-## Tag and publish
+## Release Flow
+
+1. Move "Unreleased" items in `CHANGELOG.md` under `## [x.y.z] - YYYY-MM-DD`.
+2. Bump `version` in `package.json` to `x.y.z`.
+3. Commit and push:
 
 ```bash
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin codex/bootstrap-sonarqube-skill
-git push origin v1.0.0
+git add CHANGELOG.md package.json
+git commit -m "release: vx.y.z"
+git push origin main
 ```
+
+4. Tag and push (triggers the GitHub Action):
+
+```bash
+git tag vx.y.z
+git push origin vx.y.z
+```
+
+5. The GitHub Action automatically:
+   - Validates scripts (`npm run validate`)
+   - Publishes to GitHub Packages
+   - Creates a GitHub Release with notes extracted from `CHANGELOG.md`
+
+## Manual Fallback
+
+If the GitHub Action fails or you need to publish manually:
+
+```bash
+npm publish
+```
+
+`prepublishOnly` runs `npm run validate` automatically before publishing.
 
 ## Post-release
 
-1. Add release notes on GitHub.
-2. Include install command pinned to tag.
-3. Mention restart requirement for Codex/Claude.
+1. Verify the GitHub Release appears with correct changelog notes.
+2. Verify the package is listed in the repo's Packages tab.
+3. Mention restart requirement for Codex/Claude in release notes.

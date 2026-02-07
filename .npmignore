@@ -1,0 +1,10 @@
+.git
+.idea
+.claude
+.sonarqube
+.scannerwork
+__pycache__
+*.pyc
+docs/
+CHANGELOG.md
+.gitignore

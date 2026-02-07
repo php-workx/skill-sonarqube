@@ -21,27 +21,44 @@ This repository provides:
 
 ## Prerequisites
 
-- `bash` 3.2+ (compatible with macOS default `/bin/bash`)
 - `python3`
 - `sonar-scanner` (local mode only)
 - `docker` (local mode only, for SonarQube container workflows)
 
-Cloud mode only requires `bash`, `python3`, `git`, and a `SONAR_TOKEN`.
+Cloud mode only requires `python3`, `git`, and a `SONAR_TOKEN`.
 
 ## Install
 
-Clone and run installer:
+### Via OpenSkills
 
 ```bash
-git clone https://github.com/php-workx/skill-sonarqube.git
-cd skill-sonarqube
-bash scripts/install-sonarqube-skill.sh
+# project-local install
+npx openskills install php-workx/skill-sonarqube
+
+# global install
+npx openskills install -g php-workx/skill-sonarqube
 ```
 
-Pinned release install (recommended):
+### Via skills.sh
 
 ```bash
-git clone --depth 1 --branch v1.0.0 https://github.com/php-workx/skill-sonarqube.git
+# project-local install
+npx skills add php-workx/skill-sonarqube
+
+# global install
+npx skills add -g php-workx/skill-sonarqube
+```
+
+### Via npm (GitHub Packages)
+
+```bash
+npm install @php-workx/skill-sonarqube --registry=https://npm.pkg.github.com
+```
+
+### Via installer script
+
+```bash
+git clone --depth 1 --branch v1.1.0 https://github.com/php-workx/skill-sonarqube.git
 cd skill-sonarqube
 bash scripts/install-sonarqube-skill.sh
 ```
