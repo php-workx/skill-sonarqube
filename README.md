@@ -72,19 +72,19 @@ Installer destination overrides:
 - `CODEX_SKILLS_DIR`
 - `CODEX_PROMPTS_DIR`
 
-See `/Users/runger/workspaces/skill-sonarqube/docs/CONFIGURATION.md` for details.
+See `docs/CONFIGURATION.md` for details.
 
 ## Repository Layout
 
-- `/Users/runger/workspaces/skill-sonarqube/.codex/skills/sonarqube`
-- `/Users/runger/workspaces/skill-sonarqube/.codex/prompts/sonarqube.md`
-- `/Users/runger/workspaces/skill-sonarqube/.agents/skills/sonarqube`
-- `/Users/runger/workspaces/skill-sonarqube/scripts/install-sonarqube-skill.sh`
+- `.codex/skills/sonarqube`
+- `.codex/prompts/sonarqube.md`
+- `.agents/skills/sonarqube`
+- `scripts/install-sonarqube-skill.sh`
 
 ## Troubleshooting
 
-See `/Users/runger/workspaces/skill-sonarqube/docs/TROUBLESHOOTING.md`.
+See `docs/TROUBLESHOOTING.md`.
 
 ## Release Process
 
-See `/Users/runger/workspaces/skill-sonarqube/docs/RELEASE.md`.
+See `docs/RELEASE.md`.

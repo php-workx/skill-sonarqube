@@ -1,0 +1,4 @@
+interface:
+  display_name: "SonarQube"
+  short_description: "List and autofix SonarQube findings on changed files"
+  default_prompt: "Use $sonarqube to list or autofix SonarQube findings for my current branch changes."
