@@ -6,10 +6,8 @@
 
 ```bash
 bash -n scripts/install-sonarqube-skill.sh
-bash -n .codex/skills/sonarqube/scripts/run_changed_scan.sh
-bash -n .agents/skills/sonarqube/scripts/run_changed_scan.sh
-python3 -m py_compile .codex/skills/sonarqube/scripts/collect_changed_issues.py
-python3 -m py_compile .agents/skills/sonarqube/scripts/collect_changed_issues.py
+bash -n skill/scripts/run_changed_scan.sh
+python3 -m py_compile skill/scripts/collect_changed_issues.py
 ```
 
 2. Smoke-install locally:

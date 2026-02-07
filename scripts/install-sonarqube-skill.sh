@@ -4,15 +4,11 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 SKILL_NAME="sonarqube"
 
-SRC_CLAUDE="$REPO_ROOT/.agents/skills/$SKILL_NAME"
-SRC_CODEX="$REPO_ROOT/.codex/skills/$SKILL_NAME"
+SRC_SKILL="$REPO_ROOT/skill"
+SRC_PROMPT="$REPO_ROOT/prompts/sonarqube.md"
 
-if [[ ! -d "$SRC_CLAUDE" ]]; then
-  echo "error: missing source Claude skill at $SRC_CLAUDE" >&2
-  exit 1
-fi
-if [[ ! -d "$SRC_CODEX" ]]; then
-  echo "error: missing source Codex skill at $SRC_CODEX" >&2
+if [[ ! -d "$SRC_SKILL" ]]; then
+  echo "error: missing source skill directory at $SRC_SKILL" >&2
   exit 1
 fi
 
@@ -33,18 +29,37 @@ mkdir -p "$DEST_CODEX_PROMPTS_BASE"
 # Remove deprecated alias if present.
 rm -rf "$DEST_CLAUDE_BASE/sonarqube-autofix" "$DEST_CODEX_BASE/sonarqube-autofix"
 
+# Atomic install: copy to temp dirs first, then move into place so a failed
+# copy never leaves the destination in a broken state.
+DEST_CLAUDE_TMP="${DEST_CLAUDE}.installing"
+DEST_CODEX_TMP="${DEST_CODEX}.installing"
+rm -rf "$DEST_CLAUDE_TMP" "$DEST_CODEX_TMP"
+
+cp -R "$SRC_SKILL" "$DEST_CLAUDE_TMP" || {
+  echo "error: failed to copy skill to Claude destination" >&2
+  rm -rf "$DEST_CLAUDE_TMP"
+  exit 1
+}
+cp -R "$SRC_SKILL" "$DEST_CODEX_TMP" || {
+  echo "error: failed to copy skill to Codex destination" >&2
+  rm -rf "$DEST_CLAUDE_TMP" "$DEST_CODEX_TMP"
+  exit 1
+}
+
 rm -rf "$DEST_CLAUDE" "$DEST_CODEX"
-cp -R "$SRC_CLAUDE" "$DEST_CLAUDE"
-cp -R "$SRC_CODEX" "$DEST_CODEX"
+mv "$DEST_CLAUDE_TMP" "$DEST_CLAUDE"
+mv "$DEST_CODEX_TMP" "$DEST_CODEX"
 
 chmod +x "$DEST_CLAUDE/scripts/run_changed_scan.sh" \
   "$DEST_CLAUDE/scripts/collect_changed_issues.py" \
   "$DEST_CODEX/scripts/run_changed_scan.sh" \
   "$DEST_CODEX/scripts/collect_changed_issues.py"
 
-PROMPT_SRC="$REPO_ROOT/.codex/prompts/sonarqube.md"
-if [[ -f "$PROMPT_SRC" ]]; then
-  cp "$PROMPT_SRC" "$DEST_CODEX_PROMPTS_BASE/sonarqube.md"
+if [[ -f "$SRC_PROMPT" ]]; then
+  cp "$SRC_PROMPT" "$DEST_CODEX_PROMPTS_BASE/sonarqube.md" || {
+    echo "error: failed to copy Codex prompt from $SRC_PROMPT" >&2
+    exit 1
+  }
 fi
 
 cat <<EOF

@@ -21,10 +21,12 @@ This repository provides:
 
 ## Prerequisites
 
-- `bash` 4+ (macOS `/bin/bash` 3.2 is too old for `mapfile`)
+- `bash` 3.2+ (compatible with macOS default `/bin/bash`)
 - `python3`
-- `sonar-scanner`
-- `docker` (for local SonarQube container workflows)
+- `sonar-scanner` (local mode only)
+- `docker` (local mode only, for SonarQube container workflows)
+
+Cloud mode only requires `bash`, `python3`, `git`, and a `SONAR_TOKEN`.
 
 ## Install
 
@@ -76,10 +78,9 @@ See `docs/CONFIGURATION.md` for details.
 
 ## Repository Layout
 
-- `.codex/skills/sonarqube`
-- `.codex/prompts/sonarqube.md`
-- `.agents/skills/sonarqube`
-- `scripts/install-sonarqube-skill.sh`
+- `skill/` — single canonical skill source (SKILL.md, scripts, agents config)
+- `prompts/sonarqube.md` — Codex slash command dispatcher
+- `scripts/install-sonarqube-skill.sh` — copies skill to both Claude and Codex directories
 
 ## Troubleshooting
 

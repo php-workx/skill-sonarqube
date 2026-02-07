@@ -37,10 +37,12 @@ THRESHOLD_TO_SEVERITY = {
     "all": "INFO",
 }
 
+SONARCLOUD_URL = "https://sonarcloud.io"
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--host-url", required=True)
+    parser.add_argument("--host-url", default="")
     parser.add_argument("--project-key", required=True)
     parser.add_argument("--changed-files", required=True)
     parser.add_argument(
@@ -56,6 +58,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--token", default="")
     parser.add_argument("--user", default="")
     parser.add_argument("--password", default="")
+    parser.add_argument(
+        "--mode",
+        choices=["local", "cloud"],
+        default="local",
+        help="local = query local SonarQube; cloud = query SonarCloud REST API",
+    )
+    parser.add_argument(
+        "--organization",
+        default="",
+        help="SonarCloud organization key (cloud mode)",
+    )
+    parser.add_argument(
+        "--branch",
+        default="",
+        help="Branch name to filter issues (cloud mode)",
+    )
     return parser.parse_args()
 
 
@@ -91,20 +109,23 @@ def build_headers(token: str, user: str, password: str) -> Dict[str, str]:
     return headers
 
 
-def fetch_issues(host_url: str, project_key: str, headers: Dict[str, str]) -> List[Dict[str, Any]]:
+def build_cloud_headers(token: str) -> Dict[str, str]:
+    """Build headers for SonarCloud (Bearer token auth)."""
+    headers = {"Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def _paginated_fetch(url_base: str, params: Dict[str, str], headers: Dict[str, str], label: str) -> List[Dict[str, Any]]:
+    """Fetch all pages from a SonarQube/SonarCloud issues search endpoint."""
     issues: List[Dict[str, Any]] = []
     page = 1
 
     while True:
-        query = urllib.parse.urlencode(
-            {
-                "projectKeys": project_key,
-                "statuses": "OPEN,CONFIRMED,REOPENED",
-                "ps": "500",
-                "p": str(page),
-            }
-        )
-        url = f"{host_url.rstrip('/')}/api/issues/search?{query}"
+        params["p"] = str(page)
+        query = urllib.parse.urlencode(params)
+        url = f"{url_base}?{query}"
         req = urllib.request.Request(url, headers=headers)
 
         try:
@@ -112,9 +133,9 @@ def fetch_issues(host_url: str, project_key: str, headers: Dict[str, str]) -> Li
                 payload = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"SonarQube API error {exc.code}: {body}") from exc
+            raise RuntimeError(f"{label} API error {exc.code}: {body}") from exc
         except urllib.error.URLError as exc:
-            raise RuntimeError(f"Cannot reach SonarQube at {host_url}: {exc}") from exc
+            raise RuntimeError(f"Cannot reach {label} at {url_base}: {exc}") from exc
 
         page_issues = payload.get("issues", [])
         issues.extend(page_issues)
@@ -127,6 +148,38 @@ def fetch_issues(host_url: str, project_key: str, headers: Dict[str, str]) -> Li
         page += 1
 
     return issues
+
+
+def fetch_issues(host_url: str, project_key: str, headers: Dict[str, str]) -> List[Dict[str, Any]]:
+    params = {
+        "projectKeys": project_key,
+        "statuses": "OPEN,CONFIRMED,REOPENED",
+        "ps": "500",
+    }
+    url_base = f"{host_url.rstrip('/')}/api/issues/search"
+    return _paginated_fetch(url_base, params, headers, "SonarQube")
+
+
+def fetch_cloud_issues(
+    project_key: str,
+    token: str,
+    organization: str = "",
+    branch: str = "",
+) -> List[Dict[str, Any]]:
+    """Fetch issues from SonarCloud REST API."""
+    headers = build_cloud_headers(token)
+    params: Dict[str, str] = {
+        "componentKeys": project_key,
+        "statuses": "OPEN,CONFIRMED,REOPENED",
+        "ps": "500",
+    }
+    if organization:
+        params["organization"] = organization
+    if branch:
+        params["branch"] = branch
+
+    url_base = f"{SONARCLOUD_URL}/api/issues/search"
+    return _paginated_fetch(url_base, params, headers, "SonarCloud")
 
 
 def issue_file_path(issue: Dict[str, Any]) -> str:
@@ -220,9 +273,23 @@ def main() -> int:
         )
 
     changed_files = load_changed_files(args.changed_files)
-    headers = build_headers(args.token, args.user, args.password)
 
-    raw_issues = fetch_issues(args.host_url, args.project_key, headers)
+    if args.mode == "cloud":
+        if not args.token:
+            raise RuntimeError("cloud mode requires --token (SONAR_TOKEN)")
+        raw_issues = fetch_cloud_issues(
+            project_key=args.project_key,
+            token=args.token,
+            organization=args.organization,
+            branch=args.branch,
+        )
+    else:
+        host_url = args.host_url
+        if not host_url:
+            raise RuntimeError("local mode requires --host-url")
+        headers = build_headers(args.token, args.user, args.password)
+        raw_issues = fetch_issues(host_url, args.project_key, headers)
+
     findings = filter_issues(raw_issues, changed_files, threshold)
 
     severity_counts = Counter(item["severity"] for item in findings)
@@ -232,7 +299,13 @@ def main() -> int:
             "severity_threshold": threshold,
             "changed_files": len(changed_files),
             "findings": len(findings),
-            "severity_counts": dict(sorted(severity_counts.items())),
+            "severity_counts": {
+                k: v
+                for k, v in sorted(
+                    severity_counts.items(),
+                    key=lambda item: -SEVERITY_ORDER.get(item[0], 0),
+                )
+            },
         },
         "findings": findings,
     }

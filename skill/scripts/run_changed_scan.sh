@@ -61,6 +61,20 @@ detect_base_ref() {
   return 1
 }
 
+extract_port() {
+  local url="$1"
+  local host_part
+  # Strip scheme.
+  host_part="${url#*://}"
+  # Strip path.
+  host_part="${host_part%%/*}"
+  if [[ "$host_part" == *:* ]]; then
+    printf '%s' "${host_part##*:}"
+  else
+    printf '9000'
+  fi
+}
+
 read_system_status() {
   curl -fsS "${HOST_URL%/}/api/system/status" 2>/dev/null \
     | sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
@@ -79,12 +93,18 @@ ensure_sonarqube_available() {
 
   require_cmd docker
 
-  if docker ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
-    log "starting existing container $CONTAINER_NAME"
-    docker start "$CONTAINER_NAME" >/dev/null
-  else
+  local host_port
+  host_port="$(extract_port "$HOST_URL")"
+
+  if ! docker start "$CONTAINER_NAME" >/dev/null 2>&1; then
     log "creating container $CONTAINER_NAME from $CONTAINER_IMAGE"
-    docker run -d --name "$CONTAINER_NAME" -p 9000:9000 "$CONTAINER_IMAGE" >/dev/null
+    if ! docker run -d --name "$CONTAINER_NAME" -p "${host_port}:9000" "$CONTAINER_IMAGE" >/dev/null 2>&1; then
+      # Another process may have created it between our check and run.
+      log "container creation failed, attempting start in case of race"
+      docker start "$CONTAINER_NAME" >/dev/null || fail "cannot start or create container $CONTAINER_NAME"
+    fi
+  else
+    log "started existing container $CONTAINER_NAME"
   fi
 
   log "waiting for SonarQube to become ready at $HOST_URL"
@@ -240,7 +260,34 @@ EOF
 fi
 
 printf '%s\n' "${CHANGED_FILES[@]}" > "$CHANGED_FILE_LIST"
-CHANGED_CSV="$(IFS=, ; printf '%s' "${CHANGED_FILES[*]}")"
+
+# Build sonar.inclusions CSV.  sonar-scanner has no escape mechanism for
+# commas inside filenames, so skip those files with a warning.
+INCLUSION_FILES=()
+for f in "${CHANGED_FILES[@]}"; do
+  if [[ "$f" == *,* ]]; then
+    log "warning: skipping file with comma in name (unsupported by sonar.inclusions): $f"
+  else
+    INCLUSION_FILES+=("$f")
+  fi
+done
+
+if [[ "${#INCLUSION_FILES[@]}" -eq 0 ]]; then
+  log "no scannable files remain after filtering"
+  printf '{"summary":{"project_key":"%s","severity_threshold":"%s","changed_files":%d,"findings":0,"severity_counts":{}},"findings":[]}\n' \
+    "${PROJECT_KEY:-unknown}" "$SEVERITY" "${#CHANGED_FILES[@]}" > "$OUTPUT_DIR_ABS/findings.json"
+  cat > "$OUTPUT_DIR_ABS/findings.md" <<EOF
+# SonarQube Findings (Changed Files)
+
+All changed files contain commas in their names and cannot be scanned.
+
+- Base ref: \`$BASE_REF\`
+- Severity threshold: \`$SEVERITY\`
+EOF
+  exit 0
+fi
+
+CHANGED_CSV="$(IFS=, ; printf '%s' "${INCLUSION_FILES[*]}")"
 
 if [[ -z "$SONAR_TOKEN" && -z "$SONAR_USER" && -z "$SONAR_PASSWORD" ]]; then
   if [[ "$HOST_URL" =~ ^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?/?$ ]]; then

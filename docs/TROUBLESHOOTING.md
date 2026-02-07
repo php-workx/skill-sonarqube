@@ -12,36 +12,33 @@ Fix:
 
 ## `required command not found: sonar-scanner`
 
-Install scanner CLI and retry:
+Only needed for local mode. Install scanner CLI and retry:
 
 ```bash
 brew install sonar-scanner
 ```
-
-## `mapfile: command not found`
-
-Cause: old bash (macOS `/bin/bash` 3.2).
-
-Fix:
-
-```bash
-brew install bash
-/opt/homebrew/bin/bash scripts/install-sonarqube-skill.sh
-```
-
-And run skill scripts with newer bash.
 
 ## Local scan cannot connect to SonarQube
 
 1. Verify Docker is running.
 2. Verify `SONAR_HOST_URL`.
 3. Confirm local SonarQube is reachable.
+4. If using a non-default port, ensure `SONAR_HOST_URL` includes the correct port (e.g. `http://localhost:9010`). The skill extracts the port and maps it automatically.
 
 ## Cloud mode cannot fetch results
 
-1. Verify auth (`SONAR_TOKEN` preferred).
-2. Verify MCP availability (if using MCP path).
-3. Check project key and permissions.
+### MCP path
+
+1. Verify a SonarQube/SonarCloud MCP server is connected.
+2. Check that the MCP server exposes issue search tools.
+3. The skill will fall back to the REST API if MCP is unavailable.
+
+### REST API path
+
+1. Verify `SONAR_TOKEN` is set. Cloud mode requires a Bearer token.
+2. Verify the token has permissions for the target project.
+3. If the project belongs to an organization, set `SONAR_ORGANIZATION`.
+4. Check project key matches SonarCloud (case-sensitive).
 
 ## Scan exits with blocked findings
 
