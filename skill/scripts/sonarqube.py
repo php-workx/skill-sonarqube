@@ -49,7 +49,7 @@ THRESHOLD_TO_SEVERITY = {
 SONARCLOUD_URL = "https://sonarcloud.io"
 
 DEFAULT_CONTAINER_NAME = "clai-sonarqube"
-DEFAULT_CONTAINER_IMAGE = "sonarqube:lts-community"
+DEFAULT_CONTAINER_IMAGE = "sonarqube:community"
 DEFAULT_WAIT_SECONDS = 300
 
 BLOCKER_CODES = (
@@ -351,6 +351,8 @@ def ensure_server(
             "docker", "run", "-d",
             "--name", container_name,
             "-p", f"{host_port}:9000",
+            "-v", f"{container_name}-data:/opt/sonarqube/data",
+            "-v", f"{container_name}-extensions:/opt/sonarqube/extensions",
             image,
         ])
         if r.returncode != 0:
