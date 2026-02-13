@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.1.1] - 2026-02-13
+
+### Added
+
+- `CLAUDE.md` project guidance file for Claude Code
+
+### Fixed
+
+- Docker container image changed from `sonarqube:lts-community` to `sonarqube:community`
+- Docker container now uses persistent named volumes for data and extensions directories
+
 ## [1.1.0] - 2026-02-07
 
 ### Added
