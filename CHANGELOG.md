@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.2.0] - 2026-03-08
+
+### Added
+
+- Repo-local Python tooling with `uv` for optional skill validation helpers
+- `validate:skill` workflow for running `skill-creator` validation with repo-local dependencies
+- Automatic local SonarQube project bootstrap, token persistence to `.env`, richer `sonar-project.properties` detection, and Rust clippy report generation
+- Regression tests covering SonarQube bootstrap, `.env` fallback, property parsing, and report generation
+
+### Changed
+
+- SonarQube skill trigger text and prompt descriptions now better match quality-gate, findings-summary, and autofix intents
+- New-code-period verification guidance now calls out branch-scoped API checks
+
 ## [1.1.1] - 2026-02-13
 
 ### Added
