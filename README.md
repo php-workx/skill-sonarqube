@@ -70,7 +70,7 @@ npm install @php-workx/skill-sonarqube --registry=https://npm.pkg.github.com
 ### Via installer script
 
 ```bash
-git clone --depth 1 --branch v1.2.0 https://github.com/php-workx/skill-sonarqube.git
+git clone --depth 1 --branch v1.3.0 https://github.com/php-workx/skill-sonarqube.git
 cd skill-sonarqube
 bash scripts/install-sonarqube-skill.sh
 ```
@@ -121,7 +121,6 @@ If the `skill-creator` validator lives outside the default install locations, se
 ## Repository Layout
 
 - `skills/sonarqube/` — canonical skill source for indexers and installers (SKILL.md, scripts, agents config)
-- `skill/` — compatibility symlink to `skills/sonarqube/`
 - `prompts/sonarqube.md` — Codex slash command dispatcher
 - `scripts/install-sonarqube-skill.sh` — copies skill to both Claude and Codex directories
 

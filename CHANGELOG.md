@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.3.0] - 2026-03-08
+
+### Added
+
+- Public npmjs publishing via OIDC trusted publishing (no long-lived token required)
+- Index-friendly skill layout: canonical source moved to `skills/sonarqube/`
+- SKILL.md: Quick Reference table, When NOT to Use section, Common Mistakes section
+
+### Changed
+
+- SKILL.md description trimmed to triggering conditions only (removed workflow summary per CSO best practices)
+- Severity Models section folded into Inputs; duplicated MCP Detection section and Execution Rules entries removed
+- Cloud autofix limitation now single-sourced in step 8 with cross-references
+- Commit guidance clarified: only commit when user asks or `CLAUDE.md` enables it
+- Fix loop now explicitly prioritizes vulnerabilities and bugs over code smells on severity ties
+- Release workflow splits npmjs and GitHub Packages into separate jobs with scoped permissions
+- Node version updated to 24 in CI
+- All internal paths updated for new `skills/sonarqube/` layout
+
 ## [1.2.0] - 2026-03-08
 
 ### Added

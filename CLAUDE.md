@@ -35,7 +35,6 @@ skills/
     SKILL.md              # Skill definition with frontmatter (name, description, full workflow)
     scripts/sonarqube.py  # Single Python script: scan + fetch subcommands
     agents/openai.yaml    # OpenAI agent metadata
-skill -> skills/sonarqube # Compatibility symlink
 prompts/sonarqube.md      # Codex /sonarqube slash command dispatcher
 scripts/install-sonarqube-skill.sh  # Copies skill to ~/.claude/skills/ and ~/.codex/skills/
 docs/                     # CONFIGURATION.md, TROUBLESHOOTING.md, RELEASE.md

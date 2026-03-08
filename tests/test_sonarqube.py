@@ -21,7 +21,6 @@ class SonarQubeScriptTests(unittest.TestCase):
     def test_repo_uses_index_friendly_skill_layout(self):
         repo_root = Path(__file__).resolve().parents[1]
         self.assertTrue((repo_root / "skills" / "sonarqube" / "SKILL.md").exists())
-        self.assertEqual((repo_root / "skill").resolve(), (repo_root / "skills" / "sonarqube").resolve())
         self.assertEqual((repo_root / "SKILL.md").resolve(), (repo_root / "skills" / "sonarqube" / "SKILL.md").resolve())
 
     def test_read_sonar_properties_returns_project_host_sources_and_tests(self):
