@@ -1,6 +1,6 @@
 ---
 name: sonarqube
-description: Use when you need a coding agent to run SonarQube/SonarCloud checks on current-branch changes, either list aggregated findings by severity or autonomously fix findings at/above a chosen severity threshold.
+description: Run SonarQube or SonarCloud checks on current-branch changes, list findings by severity, or autofix issues at or above a chosen threshold. Use when the user asks to run `/sonarqube`, list or summarize Sonar findings, fix Sonar issues, check a quality gate, review new-code issues on changed files, or work with local SonarQube or SonarCloud results.
 ---
 
 # SonarQube
@@ -90,6 +90,7 @@ python3 "<path-to-skill>/scripts/sonarqube.py" scan \
   - Reuse `SONAR_TOKEN` from process env first, then repo-local `.env`
   - If no token is available and the server is local, use `admin/admin`, create the SonarQube project, generate a token, and persist it to `.env`
   - Configure the new code period with `type=REFERENCE_BRANCH` and the detected base branch (`main` by default)
+  - If you verify the new code period through the API, query `/api/new_code_periods/show` with both `project` and `branch`; project-only responses can still show the inherited default
   - Read `sonar.host.url`, `sonar.sources`, and `sonar.tests` from `sonar-project.properties` when present
   - Warn if `sonar.sources` appears to include test paths but `sonar.tests` is unset
   - Before scanning Rust repos, run `cargo clippy --message-format=json --all-targets --all-features` and pass `sonar.rust.clippy.reportPaths`

@@ -1,5 +1,5 @@
 ---
-description: Run SonarQube workflow using the sonarqube skill (actions: list or autofix).
+description: Run the SonarQube skill to list findings, check quality gates, or autofix SonarQube/SonarCloud issues on current-branch changes.
 ---
 
 ## User Input
