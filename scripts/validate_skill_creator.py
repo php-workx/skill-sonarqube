@@ -24,7 +24,7 @@ def find_validator() -> Path | None:
 
 
 def main() -> int:
-    target = sys.argv[1] if len(sys.argv) > 1 else "skill"
+    target = sys.argv[1] if len(sys.argv) > 1 else "skills/sonarqube"
     validator = find_validator()
     if validator is None:
         print(

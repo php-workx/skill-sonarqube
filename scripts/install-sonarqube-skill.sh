@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 SKILL_NAME="sonarqube"
 
-SRC_SKILL="$REPO_ROOT/skill"
+SRC_SKILL="$REPO_ROOT/skills/$SKILL_NAME"
 SRC_PROMPT="$REPO_ROOT/prompts/sonarqube.md"
 
 if [[ ! -d "$SRC_SKILL" ]]; then

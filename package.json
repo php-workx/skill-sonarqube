@@ -17,19 +17,21 @@
   "scripts": {
     "setup:python": "uv sync --dev",
     "test": "python3 -m unittest tests/test_sonarqube.py",
-    "validate:skill": "uv run --dev python scripts/validate_skill_creator.py skill",
-    "validate": "python3 -m py_compile skill/scripts/sonarqube.py && npm test && bash -n scripts/install-sonarqube-skill.sh",
+    "validate:skill": "uv run --dev python scripts/validate_skill_creator.py skills/sonarqube",
+    "validate": "python3 -m py_compile skills/sonarqube/scripts/sonarqube.py && npm test && bash -n scripts/install-sonarqube-skill.sh",
     "prepublishOnly": "npm run validate"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/php-workx/skill-sonarqube.git"
+    "url": "git+https://github.com/php-workx/skill-sonarqube.git"
   },
   "license": "MIT",
   "files": [
+    "skills/",
     "skill/",
     "prompts/",
     "scripts/",

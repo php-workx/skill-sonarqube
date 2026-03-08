@@ -30,10 +30,12 @@ There are no test suites or linters configured beyond `npm run validate`.
 ## Repository Layout
 
 ```
-skill/                    # Canonical skill source (installed to agent skill dirs)
-  SKILL.md                # Skill definition with frontmatter (name, description, full workflow)
-  scripts/sonarqube.py    # Single Python script: scan + fetch subcommands
-  agents/openai.yaml      # OpenAI agent metadata
+skills/
+  sonarqube/              # Canonical skill source (installed to agent skill dirs)
+    SKILL.md              # Skill definition with frontmatter (name, description, full workflow)
+    scripts/sonarqube.py  # Single Python script: scan + fetch subcommands
+    agents/openai.yaml    # OpenAI agent metadata
+skill -> skills/sonarqube # Compatibility symlink
 prompts/sonarqube.md      # Codex /sonarqube slash command dispatcher
 scripts/install-sonarqube-skill.sh  # Copies skill to ~/.claude/skills/ and ~/.codex/skills/
 docs/                     # CONFIGURATION.md, TROUBLESHOOTING.md, RELEASE.md
@@ -41,11 +43,11 @@ docs/                     # CONFIGURATION.md, TROUBLESHOOTING.md, RELEASE.md
 
 ## Architecture
 
-**Single-script design**: `skill/scripts/sonarqube.py` is a zero-dependency Python 3 script (stdlib only, optional PyYAML) that handles both local SonarQube and SonarCloud workflows. It has two subcommands:
+**Single-script design**: `skills/sonarqube/scripts/sonarqube.py` is a zero-dependency Python 3 script (stdlib only, optional PyYAML) that handles both local SonarQube and SonarCloud workflows. It has two subcommands:
 - `scan`: full pipeline — detect base ref, compute changed files/lines, ensure server (local), run scanner (local), fetch issues, filter, output findings
 - `fetch`: backward-compatible issue fetch from an existing scan
 
-**Skill definition**: `skill/SKILL.md` contains the complete autonomous workflow that agents follow. It defines the input resolution steps, severity mapping, scan/fix loop, stop conditions, and output schema. Changes to agent behavior start here.
+**Skill definition**: `skills/sonarqube/SKILL.md` contains the complete autonomous workflow that agents follow. It defines the input resolution steps, severity mapping, scan/fix loop, stop conditions, and output schema. Changes to agent behavior start here.
 
 **Dual-mode operation**:
 - **Local mode**: manages a Docker SonarQube container, runs `sonar-scanner`, fetches results via local API. Iterative fix loop with re-scan verification.

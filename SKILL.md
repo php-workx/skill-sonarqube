@@ -1,1 +1,1 @@
-skill/SKILL.md
+skills/sonarqube/SKILL.md
