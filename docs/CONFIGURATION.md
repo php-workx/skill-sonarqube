@@ -6,12 +6,15 @@
 
 - `SONAR_TOKEN`: preferred auth token. Used as Basic auth for local mode, Bearer auth for cloud mode.
 - `SONAR_PROJECT_KEY`: Sonar project key. Auto-detected from `sonar-project.properties` or repository name if omitted.
+- Repo-local `.env`: local mode reads `SONAR_TOKEN`, `SONAR_HOST_URL`, `SONAR_USER`, and `SONAR_PASSWORD` from `.env` when process env vars are unset.
 
 ### Local Mode
 
 - `SONAR_HOST_URL`: SonarQube URL. Default: `http://localhost:9000`.
 - `SONAR_USER`: username fallback when token is not set.
 - `SONAR_PASSWORD`: password fallback when token is not set.
+- If no token is available, local mode uses `admin/admin` for localhost, creates the project, generates a user token, and writes `SONAR_TOKEN` into repo-local `.env`.
+- Local mode also configures the new code period with `REFERENCE_BRANCH` pointing at the detected base branch (`main` by default).
 
 ### Cloud Mode
 
@@ -49,6 +52,10 @@ Optional config file at the repo root. Provides defaults that can be overridden 
 
 Precedence: CLI flags > environment variables > config file > hardcoded defaults.
 
+For auth and host settings, local mode inserts repo-local `.env` between process environment variables and the config file:
+
+`CLI flags > process environment > repo .env > .sonarqube-skill.yaml > hardcoded defaults`
+
 ```yaml
 version: 1
 defaults:
@@ -69,6 +76,32 @@ scan:
 - If the file is missing, all values use hardcoded defaults.
 - If the file is malformed, a warning is printed and defaults are used.
 - Uses PyYAML if available; falls back to a built-in parser for this schema.
+
+## `sonar-project.properties`
+
+When present at the repo root, the script reads:
+
+- `sonar.projectKey`
+- `sonar.host.url`
+- `sonar.sources`
+- `sonar.tests`
+
+These values are used to reduce duplication with `.sonarqube-skill.yaml`.
+
+Recommended pattern:
+
+```properties
+sonar.projectKey=my-project
+sonar.host.url=http://localhost:9000
+sonar.sources=src
+sonar.tests=tests
+```
+
+If `sonar.sources` includes likely test paths and `sonar.tests` is unset, the script logs a warning so the project can separate production and test analysis.
+
+## Language-Specific Reports
+
+- Rust: if `Cargo.toml` is present, local mode runs `cargo clippy --message-format=json --all-targets --all-features` and passes the generated report via `sonar.rust.clippy.reportPaths`.
 
 ## Installer Destination Overrides
 

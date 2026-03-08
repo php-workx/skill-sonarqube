@@ -1,6 +1,7 @@
 # Sonar outputs
 .sonarqube/
 .scannerwork/
+.env
 
 # macOS
 .DS_Store
@@ -11,3 +12,6 @@ __pycache__/
 
 # IDEs
 .idea
+
+.agents/
+firebase-debug.log

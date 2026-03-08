@@ -69,6 +69,15 @@ CONFIG_DEFAULTS = {
     "exclude_paths": [],
 }
 
+COMMON_TEST_PATH_PARTS = {
+    "test",
+    "tests",
+    "__tests__",
+    "spec",
+    "specs",
+    "integration-tests",
+}
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -285,18 +294,65 @@ def _parse_simple_yaml(raw: str) -> Optional[Dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
-# Project key detection
+# Sonar project property helpers
 # ---------------------------------------------------------------------------
 
+def read_sonar_properties(repo_root: str) -> Dict[str, str]:
+    props_path = os.path.join(repo_root, "sonar-project.properties")
+    if not os.path.isfile(props_path):
+        return {}
+
+    props: Dict[str, str] = {}
+    with open(props_path, "r", encoding="utf-8") as fh:
+        for raw_line in fh:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or line.startswith("!"):
+                continue
+
+            separator = "=" if "=" in line else ":" if ":" in line else ""
+            if not separator:
+                continue
+
+            key, value = line.split(separator, 1)
+            props[key.strip()] = value.strip()
+    return props
+
+
 def detect_project_key(repo_root: str) -> str:
-    props = os.path.join(repo_root, "sonar-project.properties")
-    if os.path.isfile(props):
-        with open(props, "r", encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if line.startswith("sonar.projectKey") and "=" in line:
-                    return line.split("=", 1)[1].strip()
-    return os.path.basename(repo_root)
+    props = read_sonar_properties(repo_root)
+    return props.get("sonar.projectKey", "").strip() or os.path.basename(repo_root)
+
+
+def detect_project_settings(repo_root: str) -> Dict[str, str]:
+    props = read_sonar_properties(repo_root)
+    return {
+        "project_key": props.get("sonar.projectKey", "").strip() or os.path.basename(repo_root),
+        "host_url": props.get("sonar.host.url", "").strip(),
+        "sources": props.get("sonar.sources", "").strip(),
+        "tests": props.get("sonar.tests", "").strip(),
+    }
+
+
+def _split_csv_paths(value: str) -> List[str]:
+    return [normalize_path(part) for part in value.split(",") if part.strip()]
+
+
+def validate_sonar_properties(props: Dict[str, str]) -> List[str]:
+    warnings: List[str] = []
+    source_paths = _split_csv_paths(props.get("sonar.sources", ""))
+    test_paths = _split_csv_paths(props.get("sonar.tests", ""))
+
+    source_test_paths = [
+        path
+        for path in source_paths
+        if any(part in COMMON_TEST_PATH_PARTS for part in Path(path).parts)
+    ]
+    if source_test_paths and not test_paths:
+        warnings.append(
+            "sonar.sources includes likely test paths; set sonar.tests separately for more accurate SonarQube analysis."
+        )
+
+    return warnings
 
 
 # ---------------------------------------------------------------------------
@@ -377,6 +433,142 @@ def ensure_server(
     fail("timed out waiting for SonarQube to become ready")
 
 
+def post_api_form(
+    host_url: str,
+    path: str,
+    headers: Dict[str, str],
+    data: Dict[str, str],
+) -> Dict[str, Any]:
+    encoded = urllib.parse.urlencode(data).encode("utf-8")
+    request_headers = dict(headers)
+    request_headers["Content-Type"] = "application/x-www-form-urlencoded"
+    api = f"{host_url.rstrip('/')}{path}"
+    req = urllib.request.Request(api, data=encoded, headers=request_headers, method="POST")
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        lowered = body.lower()
+        if path == "/api/projects/create" and "already exists" in lowered:
+            return {"status": "already_exists"}
+        raise RuntimeError(f"SonarQube API error {exc.code} at {path}: {body}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Cannot reach SonarQube at {api}: {exc}") from exc
+
+    if not body:
+        return {}
+    return json.loads(body)
+
+
+def load_dotenv_file(path: str) -> Dict[str, str]:
+    if not os.path.isfile(path):
+        return {}
+
+    env_vars: Dict[str, str] = {}
+    with open(path, "r", encoding="utf-8") as fh:
+        for raw_line in fh:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            env_vars[key.strip()] = value.strip().strip("'\"")
+    return env_vars
+
+
+def _write_dotenv_value(path: str, key: str, value: str) -> None:
+    env_path = Path(path)
+    existing = []
+    if env_path.is_file():
+        existing = env_path.read_text(encoding="utf-8").splitlines()
+
+    updated = False
+    new_lines: List[str] = []
+    for line in existing:
+        if line.startswith(f"{key}="):
+            new_lines.append(f"{key}={value}")
+            updated = True
+        else:
+            new_lines.append(line)
+    if not updated:
+        new_lines.append(f"{key}={value}")
+
+    env_path.write_text("\n".join(new_lines).rstrip() + "\n", encoding="utf-8")
+
+
+def resolve_setting(
+    cli_val: str,
+    env_key: str,
+    dotenv: Dict[str, str],
+    config_val: str,
+    default: str,
+) -> str:
+    if cli_val:
+        return cli_val
+    env_val = os.environ.get(env_key, "")
+    if env_val:
+        return env_val
+    dotenv_val = dotenv.get(env_key, "")
+    if dotenv_val:
+        return dotenv_val
+    if config_val:
+        return config_val
+    return default
+
+
+def bootstrap_local_project(
+    host_url: str,
+    project_key: str,
+    project_name: str,
+    token: str,
+    user: str,
+    password: str,
+    env_path: str,
+    reference_branch: str = "main",
+) -> Tuple[str, str, str]:
+    headers = build_headers(token, user, password)
+    post_api_form(
+        host_url,
+        "/api/projects/create",
+        headers,
+        {"project": project_key, "name": project_name},
+    )
+
+    resolved_token = token
+    resolved_user = user
+    resolved_password = password
+
+    if not resolved_token:
+        token_name = f"sonarqube-skill-{project_key}-{int(time.time())}"
+        token_payload = post_api_form(
+            host_url,
+            "/api/user_tokens/generate",
+            headers,
+            {"name": token_name},
+        )
+        resolved_token = str(token_payload.get("token", "")).strip()
+        if not resolved_token:
+            raise RuntimeError("SonarQube token generation returned no token")
+        _write_dotenv_value(env_path, "SONAR_TOKEN", resolved_token)
+        resolved_user = ""
+        resolved_password = ""
+        headers = build_headers(resolved_token, resolved_user, resolved_password)
+
+    post_api_form(
+        host_url,
+        "/api/new_code_periods/set",
+        headers,
+        {
+            "project": project_key,
+            "type": "REFERENCE_BRANCH",
+            "value": reference_branch or "main",
+        },
+    )
+
+    return resolved_token, resolved_user, resolved_password
+
+
 # ---------------------------------------------------------------------------
 # Scanner invocation
 # ---------------------------------------------------------------------------
@@ -390,6 +582,9 @@ def run_scanner(
     user: str,
     password: str,
     output_dir: str,
+    sources: str = "",
+    tests: str = "",
+    extra_properties: Optional[Dict[str, str]] = None,
 ) -> None:
     if not shutil.which("sonar-scanner"):
         fail("required command not found: sonar-scanner")
@@ -403,6 +598,13 @@ def run_scanner(
         "-Dsonar.qualitygate.wait=true",
         "-Dsonar.qualitygate.timeout=300",
     ]
+    if sources:
+        cmd.append(f"-Dsonar.sources={sources}")
+    if tests:
+        cmd.append(f"-Dsonar.tests={tests}")
+    if extra_properties:
+        for key, value in sorted(extra_properties.items()):
+            cmd.append(f"-D{key}={value}")
     if token:
         cmd.append(f"-Dsonar.token={token}")
     else:
@@ -444,6 +646,34 @@ def load_changed_files(path: str) -> set[str]:
             if line:
                 files.add(normalize_path(line))
     return files
+
+
+def prepare_language_reports(repo_root: str, output_dir: str) -> Dict[str, str]:
+    scanner_properties: Dict[str, str] = {}
+    cargo_toml = os.path.join(repo_root, "Cargo.toml")
+    if os.path.isfile(cargo_toml):
+        scanner_properties.update(_prepare_rust_clippy_report(repo_root, output_dir))
+    return scanner_properties
+
+
+def _prepare_rust_clippy_report(repo_root: str, output_dir: str) -> Dict[str, str]:
+    if not shutil.which("cargo"):
+        log("warning: Cargo.toml detected but cargo is not installed; skipping clippy report generation")
+        return {}
+
+    report_path = os.path.join(output_dir, "rust-clippy.json")
+    cmd = ["cargo", "clippy", "--message-format=json", "--all-targets", "--all-features"]
+    log("running cargo clippy to generate SonarQube Rust report")
+    with open(report_path, "w", encoding="utf-8") as report_file:
+        result = subprocess.run(cmd, cwd=repo_root, stdout=report_file, stderr=subprocess.PIPE, text=True)
+
+    if result.returncode != 0:
+        log("warning: cargo clippy failed; continuing without sonar.rust.clippy.reportPaths")
+        if os.path.isfile(report_path):
+            os.remove(report_path)
+        return {}
+
+    return {"sonar.rust.clippy.reportPaths": report_path}
 
 
 # ---------------------------------------------------------------------------
@@ -702,20 +932,16 @@ def write_blocked_json(path: str, blocked: List[Dict[str, str]]) -> None:
 # Subcommand: scan (replaces run_changed_scan.sh)
 # ---------------------------------------------------------------------------
 
-def _resolve(cli_val: str, env_key: str, config_val: str, default: str) -> str:
-    """Resolve a value by precedence: CLI > env > config > default."""
-    if cli_val:
-        return cli_val
-    env_val = os.environ.get(env_key, "")
-    if env_val:
-        return env_val
-    if config_val:
-        return config_val
-    return default
+def _resolve(cli_val: str, env_key: str, dotenv: Dict[str, str], config_val: str, default: str) -> str:
+    """Resolve a value by precedence: CLI > env > .env > config > default."""
+    return resolve_setting(cli_val, env_key, dotenv, config_val, default)
 
 
 def cmd_scan(args: argparse.Namespace) -> int:
     repo_root = git_repo_root()
+    env_path = os.path.join(repo_root, ".env")
+    dotenv = load_dotenv_file(env_path)
+    project_settings = detect_project_settings(repo_root)
 
     # Load config file.
     config_path = args.config
@@ -725,7 +951,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
 
     # Resolve values: CLI > env > config > default.
     mode = args.mode or cfg.get("mode", "local")
-    severity = _resolve(args.severity, "", cfg.get("severity", ""), "high").lower().strip()
+    severity = _resolve(args.severity, "", dotenv, cfg.get("severity", ""), "high").lower().strip()
     scope = args.scope or cfg.get("scope", "new")
     if severity not in THRESHOLD_TO_SEVERITY:
         fail(f"invalid severity '{args.severity}' (expected blocker|high|medium|low|info)")
@@ -736,7 +962,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
     os.makedirs(output_dir, exist_ok=True)
 
     # Resolve base ref.
-    base_ref = _resolve(args.base_ref, "", cfg.get("base_ref", ""), "")
+    base_ref = _resolve(args.base_ref, "", dotenv, cfg.get("base_ref", ""), "")
     if not base_ref:
         base_ref = detect_base_ref()
     if not base_ref:
@@ -750,12 +976,12 @@ def cmd_scan(args: argparse.Namespace) -> int:
         log(f"no changed files between {base_ref} and HEAD")
         write_json(
             os.path.join(output_dir, "findings.json"),
-            args.project_key or detect_project_key(repo_root),
+            args.project_key or project_settings["project_key"],
             severity, 0, [], scope=scope,
         )
         write_markdown(
             os.path.join(output_dir, "findings.md"),
-            args.project_key or detect_project_key(repo_root),
+            args.project_key or project_settings["project_key"],
             severity, 0, [],
         )
         return 0
@@ -766,14 +992,23 @@ def cmd_scan(args: argparse.Namespace) -> int:
         changed_lines = compute_changed_lines(repo_root, base_ref, output_dir)
 
     # Resolve project key.
-    project_key = args.project_key or detect_project_key(repo_root)
+    project_key = args.project_key or project_settings["project_key"]
+    sources = project_settings["sources"]
+    tests = project_settings["tests"]
+    for warning in validate_sonar_properties(
+        {
+            "sonar.sources": sources,
+            "sonar.tests": tests,
+        }
+    ):
+        log(f"warning: {warning}")
 
     # Resolve auth.
-    token = _resolve(args.token, "SONAR_TOKEN", "", "")
-    user = _resolve(args.user, "SONAR_USER", "", "")
-    password = _resolve(args.password, "SONAR_PASSWORD", "", "")
-    host_url = _resolve(args.host_url, "SONAR_HOST_URL", "", "http://localhost:9000")
-    organization = _resolve(args.organization, "SONAR_ORGANIZATION", "", "")
+    token = _resolve(args.token, "SONAR_TOKEN", dotenv, "", "")
+    user = _resolve(args.user, "SONAR_USER", dotenv, "", "")
+    password = _resolve(args.password, "SONAR_PASSWORD", dotenv, "", "")
+    host_url = args.host_url or os.environ.get("SONAR_HOST_URL") or dotenv.get("SONAR_HOST_URL", "") or project_settings["host_url"] or "http://localhost:9000"
+    organization = _resolve(args.organization, "SONAR_ORGANIZATION", dotenv, "", "")
 
     json_path = os.path.join(output_dir, "findings.json")
     md_path = os.path.join(output_dir, "findings.md")
@@ -805,6 +1040,18 @@ def cmd_scan(args: argparse.Namespace) -> int:
             wait_seconds=int(os.environ.get("SONARQUBE_WAIT_SECONDS", str(DEFAULT_WAIT_SECONDS))),
         )
 
+        reference_branch = base_ref.split("/", 1)[1] if "/" in base_ref else base_ref
+        token, user, password = bootstrap_local_project(
+            host_url=host_url,
+            project_key=project_key,
+            project_name=project_key,
+            token=token,
+            user=user,
+            password=password,
+            env_path=env_path,
+            reference_branch=reference_branch or "main",
+        )
+
         # Filter comma files for sonar.inclusions.
         inclusion_files = []
         for f in changed_files:
@@ -820,9 +1067,22 @@ def cmd_scan(args: argparse.Namespace) -> int:
             return 0
 
         inclusions_csv = ",".join(inclusion_files)
+        extra_properties = prepare_language_reports(repo_root, output_dir)
 
         # Run scanner.
-        run_scanner(repo_root, host_url, project_key, inclusions_csv, token, user, password, output_dir)
+        run_scanner(
+            repo_root,
+            host_url,
+            project_key,
+            inclusions_csv,
+            token,
+            user,
+            password,
+            output_dir,
+            sources=sources,
+            tests=tests,
+            extra_properties=extra_properties,
+        )
 
         # Fetch issues from local API.
         headers = build_headers(token, user, password)

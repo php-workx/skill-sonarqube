@@ -17,9 +17,10 @@ Runs SonarQube/SonarCloud against files changed on the current branch, then iter
 - `scope`: `new|changed` (default `new`). `new` = only findings on changed lines; `changed` = all findings on changed files.
 - `base_ref`: branch to diff against (default auto-detect: `origin/main`, `main`, `origin/master`, `master`)
 - `host_url`: SonarQube URL (default `http://localhost:9000`; ignored in cloud mode)
-- `auth`: prefer `SONAR_TOKEN`; fallback `SONAR_USER` + `SONAR_PASSWORD`
+- `auth`: prefer `SONAR_TOKEN`; fallback to repo-local `.env`, then `SONAR_USER` + `SONAR_PASSWORD`
 - `organization`: SonarCloud organization key (cloud mode only)
 - `config`: path to `.sonarqube-skill.yaml` (optional, auto-detected at repo root). Provides defaults overridable by CLI/env.
+- `sonar-project.properties`: if present, read `sonar.projectKey`, `sonar.host.url`, `sonar.sources`, and `sonar.tests`
 
 ## Severity Models
 
@@ -37,12 +38,13 @@ This skill understands both Sonar severity models and maps them consistently:
 ## Bundled Script
 
 - `scripts/sonarqube.py`: single Python script handling both local and cloud modes. Subcommands:
-  - `scan`: full pipeline — detect base ref, compute changed files, ensure server (local), run scanner (local), fetch issues, output findings.
+  - `scan`: full pipeline — detect base ref, compute changed files, ensure server (local), bootstrap local SonarQube project state, run scanner (local), fetch issues, output findings.
   - `fetch`: fetch issues from an existing scan and filter to changed files (backward-compatible).
 
 Outputs (default directory `.sonarqube/`):
 - `changed-files.txt`
 - `changed-lines.json` (when `scope=new`)
+- `rust-clippy.json` (when Rust report generation succeeds)
 - `sonar-scanner.log` (local mode only)
 - `findings.json`
 - `findings.md`
@@ -84,6 +86,13 @@ python3 "<path-to-skill>/scripts/sonarqube.py" scan \
   --mode local --severity "${SEVERITY:-high}" --scope "${SCOPE:-new}" \
   --base-ref "${BASE_REF:-origin/main}"
 ```
+- Local scan setup requirements:
+  - Reuse `SONAR_TOKEN` from process env first, then repo-local `.env`
+  - If no token is available and the server is local, use `admin/admin`, create the SonarQube project, generate a token, and persist it to `.env`
+  - Configure the new code period with `type=REFERENCE_BRANCH` and the detected base branch (`main` by default)
+  - Read `sonar.host.url`, `sonar.sources`, and `sonar.tests` from `sonar-project.properties` when present
+  - Warn if `sonar.sources` appears to include test paths but `sonar.tests` is unset
+  - Before scanning Rust repos, run `cargo clippy --message-format=json --all-targets --all-features` and pass `sonar.rust.clippy.reportPaths`
 - Skip to step 6 (interpret exit code).
 
 5. For `cloud` mode, fetch existing findings (no local scanner needed).
@@ -206,5 +215,5 @@ When in cloud mode, before falling back to the REST API script:
 - Do not ask the user to review each finding during this workflow.
 - For local mode, do not claim success without a fresh final scan (`exit 0`) and test evidence. For cloud mode, run tests but note that scan verification is deferred to CI/CD.
 - Prioritize vulnerabilities and bugs over code smells when severities tie.
-- If SonarQube is local and no credentials are provided, `sonarqube.py` defaults to `admin/admin`.
+- If SonarQube is local and no credentials are provided, `sonarqube.py` defaults to `admin/admin`, provisions a token, and stores it in repo-local `.env`.
 - Cloud mode does not require `sonar-scanner` or `docker`.

@@ -25,6 +25,25 @@ brew install sonar-scanner
 3. Confirm local SonarQube is reachable.
 4. If using a non-default port, ensure `SONAR_HOST_URL` includes the correct port (e.g. `http://localhost:9010`). The skill extracts the port and maps it automatically.
 
+## Local mode keeps asking for credentials
+
+1. Check whether repo-local `.env` already contains `SONAR_TOKEN`.
+2. If not, make sure the local server is reachable at `SONAR_HOST_URL` or `sonar.host.url`.
+3. For `localhost`, the skill falls back to `admin/admin`, generates a token, and stores it in `.env`.
+4. If token generation fails, inspect `.sonarqube/sonar-scanner.log` and the script stderr for the underlying SonarQube API error.
+
+## Quality gate passes but new-code findings look wrong
+
+1. Verify the project has a configured new code period in SonarQube.
+2. The skill now sets `REFERENCE_BRANCH` automatically during local bootstrap.
+3. If your repo uses a non-`main` base branch, run the scan with `--base-ref` so the reference branch is derived correctly.
+
+## Rust findings are missing from local scans
+
+1. Confirm `Cargo.toml` exists at the repo root.
+2. Verify `cargo` is installed and `cargo clippy` succeeds locally.
+3. The skill writes the clippy JSON report into `.sonarqube/rust-clippy.json` before scanning.
+
 ## Cloud mode cannot fetch results
 
 ### MCP path

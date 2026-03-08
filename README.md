@@ -11,12 +11,16 @@ This repository provides:
 ## Features
 
 - Scan only files changed on the current branch (vs base ref)
+- Local mode auto-starts SonarQube, creates the project, configures the new code period, and persists a generated token in repo-local `.env`
 - Two actions:
   - `list`: aggregated findings by severity
   - `autofix`: iteratively fix findings at/above threshold
 - Two scan modes:
   - `local`: local SonarQube instance/container
   - `cloud`: SonarCloud/SonarQube cloud APIs or MCP
+- Reads `sonar-project.properties` for `sonar.projectKey`, `sonar.host.url`, `sonar.sources`, and `sonar.tests`
+- Warns when test paths are mixed into `sonar.sources` without `sonar.tests`
+- Generates a Rust clippy report automatically when `Cargo.toml` is present
 - Supports both severity models (`high/medium/...` and `critical/major/...`)
 
 ## Prerequisites
@@ -81,9 +85,11 @@ Natural language usage also works when `sonarqube` skill is selected by intent.
 
 Runtime environment variables:
 
-- `SONAR_TOKEN` (preferred)
+- `SONAR_TOKEN` (preferred; falls back to repo-local `.env` in local mode)
 - `SONAR_USER`, `SONAR_PASSWORD` (fallback)
 - `SONAR_HOST_URL` (default `http://localhost:9000`)
+
+Local mode also reads `sonar-project.properties` directly before falling back to `.sonarqube-skill.yaml` for host and source settings.
 
 Installer destination overrides:
 
