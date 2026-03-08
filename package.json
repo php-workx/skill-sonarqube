@@ -1,6 +1,6 @@
 {
   "name": "@php-workx/skill-sonarqube",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "SonarQube/SonarCloud skill for AI coding agents (Claude, Codex, Cursor). Scan changed files, list findings by severity, or autofix issues autonomously.",
   "keywords": [
     "skill",

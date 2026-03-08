@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.3.1] - 2026-03-08
+
+### Fixed
+
+- CI: add `--provenance` flag to `npm publish` for OIDC trusted publishing
+
 ## [1.3.0] - 2026-03-08
 
 ### Added
