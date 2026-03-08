@@ -99,6 +99,17 @@ Installer destination overrides:
 
 See `docs/CONFIGURATION.md` for details.
 
+## Python Tooling
+
+Repo-local Python tooling uses `uv` for optional development helpers such as `skill-creator` validation:
+
+```bash
+uv sync --dev
+npm run validate:skill
+```
+
+If the `skill-creator` validator lives outside the default install locations, set `SKILL_CREATOR_VALIDATE_SCRIPT` to its `quick_validate.py` path before running `npm run validate:skill`.
+
 ## Repository Layout
 
 - `skill/` — single canonical skill source (SKILL.md, scripts, agents config)

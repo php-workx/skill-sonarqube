@@ -12,6 +12,12 @@ A SonarQube/SonarCloud skill package for AI coding agents (Claude, Codex, Cursor
 # Validate (compile-checks Python + bash syntax)
 npm run validate
 
+# Set up repo-local Python tooling for optional validator helpers
+uv sync --dev
+
+# Run skill-creator quick validation through the repo venv
+npm run validate:skill
+
 # Preview package contents before publish
 npm pack --dry-run
 
