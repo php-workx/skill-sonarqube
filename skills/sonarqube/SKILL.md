@@ -1,6 +1,6 @@
 ---
 name: sonarqube
-description: Run SonarQube or SonarCloud checks on current-branch changes, list findings by severity, or autofix issues at or above a chosen threshold. Use when the user asks to run `/sonarqube`, list or summarize Sonar findings, fix Sonar issues, check a quality gate, review new-code issues on changed files, or work with local SonarQube or SonarCloud results.
+description: Use when the user asks to run `/sonarqube`, list or summarize Sonar findings, fix Sonar issues, check a quality gate, review new-code issues on changed files, or work with local SonarQube or SonarCloud results.
 ---
 
 # SonarQube
@@ -9,11 +9,27 @@ description: Run SonarQube or SonarCloud checks on current-branch changes, list 
 
 Runs SonarQube/SonarCloud against files changed on the current branch, then iteratively fixes findings at/above a target severity (`high` by default) until clean or blocked.
 
+## Quick Reference
+
+| Setting | Options | Default |
+|---------|---------|---------|
+| Action | `autofix` / `list` | ask once, then `autofix` |
+| Mode | `local` / `cloud` | ask once, then `local` |
+| Severity | `blocker` / `high` / `medium` / `low` / `info` | `high` |
+| Scope | `new` (changed lines) / `changed` (changed files) | `new` |
+| Exit codes | `0` clean, `3` findings exist, `1` blocked | — |
+
+## When NOT to Use
+
+- Project has no SonarQube server and no SonarCloud integration — set one up first.
+- Findings are from a different branch or an unrelated project key.
+- User wants a full-repo scan (not scoped to current branch changes) — use SonarQube UI directly.
+
 ## Inputs
 
 - `action`: `autofix|list` (resolved from user intent)
 - `mode`: `local|cloud` (default `local`)
-- `severity`: `blocker|high|medium|low|info` (default `high`)
+- `severity`: `blocker|high|medium|low|info` (default `high`). Both software-quality labels (`high`, `medium`, `low`) and API/legacy labels (`critical`, `major`, `minor`) are accepted; the script normalizes automatically.
 - `scope`: `new|changed` (default `new`). `new` = only findings on changed lines; `changed` = all findings on changed files.
 - `base_ref`: branch to diff against (default auto-detect: `origin/main`, `main`, `origin/master`, `master`)
 - `host_url`: SonarQube URL (default `http://localhost:9000`; ignored in cloud mode)
@@ -21,19 +37,6 @@ Runs SonarQube/SonarCloud against files changed on the current branch, then iter
 - `organization`: SonarCloud organization key (cloud mode only)
 - `config`: path to `.sonarqube-skill.yaml` (optional, auto-detected at repo root). Provides defaults overridable by CLI/env.
 - `sonar-project.properties`: if present, read `sonar.projectKey`, `sonar.host.url`, `sonar.sources`, and `sonar.tests`
-
-## Severity Models
-
-This skill understands both Sonar severity models and maps them consistently:
-
-- Software-quality labels: `blocker|high|medium|low|info` (preferred input)
-- API/legacy labels: `blocker|critical|major|minor|info`
-- Mapping used by this skill:
-  - `blocker` -> `BLOCKER`
-  - `high`/`critical` -> `CRITICAL`
-  - `medium`/`major` -> `MAJOR`
-  - `low`/`minor` -> `MINOR`
-  - `info` -> `INFO`
 
 ## Bundled Script
 
@@ -119,7 +122,7 @@ python3 "<path-to-skill>/scripts/sonarqube.py" scan \
 
    d. If `action=list`, print aggregated findings from `.sonarqube/findings.json` and stop (no code edits).
 
-   e. **Cloud autofix limitation**: cloud mode cannot re-scan after local fixes (SonarCloud only re-analyzes after push + CI/CD). When `action=autofix`, the agent applies fixes in a single pass based on cloud findings, runs tests, then stops. No iterative verification loop. Advise the user to push and let CI/CD verify.
+   e. **Cloud autofix limitation**: cloud mode uses a single-pass fix (see step 8, cloud mode). No iterative re-scan.
 
 6. Interpret exit code (both modes).
 - `0`: no actionable findings; stop.
@@ -139,7 +142,7 @@ python3 "<path-to-skill>/scripts/sonarqube.py" scan \
 8. Fix loop.
 - **Local mode** (iterative, no user checkpoints):
   - Set `MAX_PASSES=8` unless user specified another limit.
-  - On each pass with exit code `3`, read `.sonarqube/findings.json` and fix highest-severity findings first.
+  - On each pass with exit code `3`, read `.sonarqube/findings.json` and fix highest-severity findings first. When severities tie, prioritize vulnerabilities and bugs over code smells.
   - Keep changes minimal and local to files in `changed-files.txt`.
   - After each pass run relevant verification (`make test` preferred; if too slow, run targeted tests for touched packages/files).
   - Re-run the scan after fixes to verify resolution.
@@ -163,12 +166,12 @@ python3 "<path-to-skill>/scripts/sonarqube.py" scan \
 10. Completion behavior.
 - Summarize files changed, remaining findings count (should be zero on success for local mode), and any blocked findings with their classifications.
 - For cloud mode autofix: include a note that fixes were applied based on cloud findings but could not be verified locally. Recommend the user push and check the next SonarCloud analysis.
-- Commit with a conventional commit message if repository policy expects autonomous commits.
+- Only commit if the user explicitly asked for a commit or the repo's `CLAUDE.md` enables autonomous commits. Use a conventional commit message (e.g. `fix: resolve sonar findings ...`).
 - Never push automatically.
 
 ## Output Schema
 
-Both modes produce the same `findings.json` schema. The fix loop behavior differs: local mode iterates with re-scan verification; cloud mode applies a single fix pass without re-scanning.
+Both modes produce the same `findings.json` schema:
 
 **findings.json:**
 ```json
@@ -200,21 +203,14 @@ Both modes produce the same `findings.json` schema. The fix loop behavior differ
 
 **findings.md:** Markdown table with columns: Severity | File | Line | Rule | Message.
 
-## MCP Detection (Cloud Mode)
+## Common Mistakes
 
-When in cloud mode, before falling back to the REST API script:
-
-1. Check your available MCP tools for names containing `sonar` (e.g. `sonarqube_issues_search`, `search_issues`).
-2. If available, call with the project key and relevant filters (severities, statuses).
-3. The MCP tool returns issues with fields like: key, rule, severity, message, component, line, status.
-4. Filter results to files listed in `.sonarqube/changed-files.txt` using the same path normalization as `sonarqube.py`.
-5. Write `findings.json` and `findings.md` using the Output Schema above.
-6. Use exit code `0` if no findings match, `3` if findings exist.
+- **Claiming success without a clean scan**: in local mode, always re-scan after fixes and require exit code `0` before reporting success.
+- **Re-scanning in cloud mode**: cloud API returns stale data until code is pushed and CI/CD re-analyzes. Apply fixes in a single pass, run tests, then advise the user to push.
+- **Editing files outside the diff**: keep changes scoped to files in `changed-files.txt`. Do not "fix" findings in unchanged files.
+- **Skipping tests**: always run tests after fixes, even if the scan is clean.
 
 ## Execution Rules
 
 - Do not ask the user to review each finding during this workflow.
-- For local mode, do not claim success without a fresh final scan (`exit 0`) and test evidence. For cloud mode, run tests but note that scan verification is deferred to CI/CD.
-- Prioritize vulnerabilities and bugs over code smells when severities tie.
-- If SonarQube is local and no credentials are provided, `sonarqube.py` defaults to `admin/admin`, provisions a token, and stores it in repo-local `.env`.
 - Cloud mode does not require `sonar-scanner` or `docker`.
