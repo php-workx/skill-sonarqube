@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.3.2] - 2026-03-28
+
+### Fixed
+
+- Local project bootstrap now checks if the SonarQube project already exists before attempting creation, avoiding 403 errors when the token has analysis but not project-admin permissions
+- `new_code_periods/set` API call now gracefully handles 403/Insufficient privileges instead of failing the entire bootstrap
+
 ## [1.3.1] - 2026-03-08
 
 ### Fixed
