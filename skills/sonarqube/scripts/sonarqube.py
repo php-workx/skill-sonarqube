@@ -528,12 +528,27 @@ def bootstrap_local_project(
     reference_branch: str = "main",
 ) -> Tuple[str, str, str]:
     headers = build_headers(token, user, password)
-    post_api_form(
-        host_url,
-        "/api/projects/create",
-        headers,
-        {"project": project_key, "name": project_name},
-    )
+    # Check if the project already exists before attempting creation (avoids
+    # 403 when the token has analysis but not project-admin permissions).
+    search_url = f"{host_url.rstrip('/')}/api/components/search?qualifiers=TRK&q={urllib.parse.quote(project_key)}"
+    search_req = urllib.request.Request(search_url, headers=headers)
+    project_exists = False
+    try:
+        with urllib.request.urlopen(search_req, timeout=15) as resp:
+            search_body = json.loads(resp.read().decode("utf-8"))
+            for comp in search_body.get("components", []):
+                if comp.get("key") == project_key:
+                    project_exists = True
+                    break
+    except Exception:
+        pass  # Fall through to create attempt.
+    if not project_exists:
+        post_api_form(
+            host_url,
+            "/api/projects/create",
+            headers,
+            {"project": project_key, "name": project_name},
+        )
 
     resolved_token = token
     resolved_user = user
@@ -555,16 +570,22 @@ def bootstrap_local_project(
         resolved_password = ""
         headers = build_headers(resolved_token, resolved_user, resolved_password)
 
-    post_api_form(
-        host_url,
-        "/api/new_code_periods/set",
-        headers,
-        {
-            "project": project_key,
-            "type": "REFERENCE_BRANCH",
-            "value": reference_branch or "main",
-        },
-    )
+    try:
+        post_api_form(
+            host_url,
+            "/api/new_code_periods/set",
+            headers,
+            {
+                "project": project_key,
+                "type": "REFERENCE_BRANCH",
+                "value": reference_branch or "main",
+            },
+        )
+    except RuntimeError as exc:
+        if "403" in str(exc) or "Insufficient privileges" in str(exc):
+            pass  # New code period likely already configured; non-fatal.
+        else:
+            raise
 
     return resolved_token, resolved_user, resolved_password
 
